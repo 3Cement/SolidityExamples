@@ -67,7 +67,40 @@ describe("Staking", () => {
             await contract.connect(staker).claim(0);
             const finalBalance = await erc20.balanceOf(staker.address);
             expect(finalBalance).to.eq(Number(reward) + 1000);
-
         })
+
+        it("reverts when already claimed", async () => {
+            const [admin, staker] = await ethers.getSigners();
+            const Staking = await ethers.getContractFactory("Staking");
+            const contract = await Staking.connect(admin).deploy();
+            const erc20 = await getErc20(admin);
+            await contract.connect(admin).setSupportedToken(erc20.target);
+            await erc20.connect(admin).transfer(contract.target, 100000);
+            await erc20.connect(admin).transfer(staker.address, 1000);
+            await erc20.connect(staker).increaseAllowance(contract.target, 1000);
+            await contract.connect(staker).stake(1000);
+            await contract.connect(staker).claim(0);
+
+            await expect(
+                contract.connect(staker).claim(0)
+            ).to.be.revertedWith("already claimed")
+        })
+
+        it("reverts when deposit is owned by different wallet", async () => {
+            const [admin, staker, hacker] = await ethers.getSigners();
+            const Staking = await ethers.getContractFactory("Staking");
+            const contract = await Staking.connect(admin).deploy();
+            const erc20 = await getErc20(admin);
+            await contract.connect(admin).setSupportedToken(erc20.target);
+            await erc20.connect(admin).transfer(contract.target, 100000);
+            await erc20.connect(admin).transfer(staker.address, 1000);
+            await erc20.connect(staker).increaseAllowance(contract.target, 1000);
+            await contract.connect(staker).stake(1000);
+
+            await expect(
+                contract.connect(hacker).claim(0)
+            ).to.be.revertedWith("not authorized");
+        })
+
     })
 });
